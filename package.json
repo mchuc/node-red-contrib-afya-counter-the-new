@@ -1,0 +1,20 @@
+{
+  "name": "node-red-contrib-afya-counter-the-new",
+  "version": "0.0.1",
+  "description": "counter that really works! / licznink, który działa na prawdę!",
+  "keywords": [
+    "couter",
+    "node-red"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mchuc/node-red-contrib-afya-counter-the-new"
+  },
+  "author": "Marcin Chuć, marcin a.t afya.pl",
+  "license": "Creative Common",
+  "node-red": {
+    "nodes": {
+      "afya-counter-the-new": "afya-counter-the-new/afya-counter-the-new.js"
+    }
+  }
+}

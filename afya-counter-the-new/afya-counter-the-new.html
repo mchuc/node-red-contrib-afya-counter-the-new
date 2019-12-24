@@ -1,0 +1,94 @@
+<!-- /**
+ * AFYA Counter The New by  Marcin Chuć
+ * e-mail: marcin ...change it to at... afya.pl
+ * (C) 2019
+ */ -->
+<script type="text/javascript">
+  RED.nodes.registerType('afya-counter-the-new', {
+        category: 'function',
+        color: '#71FFC2',
+        paletteLabel: 'counter-the-new',
+        defaults: {
+          name: {
+            value: ""
+          },
+          variableName: {
+            value: -1,
+            required: true,
+          },
+          countTime: {
+            value: 60000,
+            required: true,
+            validate: RED.validators.number()
+          },
+          minTimePeriod: {
+            value: 1000,
+            required: true,
+            validate: RED.validators.number()
+          },
+        },
+          inputs: 1,
+          outputs: 1,
+          icon: "history.png",
+          label: function() {
+            return this.name || "CT: "+ this.countTime + " ms  -> + 1 every " + this.minTimePeriod + " ms";
+          },
+          oneditprepare: function() {
+            if ($("#node-input-variableName").val() == -1) {
+              $("#node-input-variableName").val("AFYA_" + Math.random().toString(36).substr(2,10) + Date.now().toString().substr(-7));
+            }
+          }
+        });
+
+</script>
+
+<script type="text/x-red" data-template-name="afya-counter-the-new">
+
+  <div class="form-row">
+         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+         <input type="text" id="node-input-name" placeholder="Name">
+  </div>
+
+  <div class="form-row">
+           <label for="node-input-variableName"><i class="icon-bookmark"></i> Variable name</label>
+           <input type="text" id="node-input-variableName" placeholder="Your_Unique_Variable_Name">
+  </div>
+
+  <div class="form-row">
+            <label for="node-config-input-countTime"><i class="icon-clock"></i> how long should he count down (in miliseconds)</label>
+            <input type="text" id="node-input-countTime" placeholder="1 min = 60000, 60 min=3600000">
+  </div>
+
+  <div class="form-row">
+       <label for="node-config-input-minTimePeriod"><i class="icon-bookmark"></i> how often increase the counter by 1</label>
+       <input type="text" id="node-input-minTimePeriod" placeholder="default 1s = : 1000">
+   </div>
+
+
+ </script>
+
+<script type="text/x-red" data-help-name="afya-counter-the-new">
+  <p><b>EN</b></p><hr>
+<p> I get annoyed at the usual Node Red counter. I feel I have no control over it. That's why I made my own, with an additional option.<br>
+You can send commands as PAYLOAD:<br>
+  <code>
+  reset -> clears the timer, does not reset the counter; that is: it adds the time to the counter by the programmed time
+  resetCounter -> reset the counter, not the timer
+  resetAll -> reset and timer and counter
+ </code>
+</p>
+
+
+
+<p><b>PL</b></p><hr>
+
+<p> Denerwuje mnie zwykły licznik w Node Red. Czuję, że nie mam nad nim kontroli. Dlatego zrobiłem swój, własny, z dodatkową opcją.<br>
+
+Można wysłać jako PAYLOAD komendy:<br>
+<code>
+  reset -> kasuje timer, nie kasuje licznika ; czyli: dodaje czas do licznika o zaprogramowany czas
+  resetCounter - > kasuje licznik, nie kasuje timera
+  resetAll -> kasuje i timer i licznik
+</code></p>
+
+ </script>
