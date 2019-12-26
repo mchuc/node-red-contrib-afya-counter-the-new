@@ -1,9 +1,11 @@
 {
   "name": "node-red-contrib-afya-counter-the-new",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "counter that really works! / licznink, który działa na prawdę!",
   "keywords": [
-    "couter",
+    "counter",
+    "timer",
+    "count down",
     "node-red"
   ],
   "repository": {

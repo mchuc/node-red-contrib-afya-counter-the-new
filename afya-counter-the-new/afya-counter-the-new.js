@@ -29,7 +29,7 @@ module.exports = function(RED) {
       */
       var countTime = Math.round(Math.abs(config.countTime)) || 60000;
       var minTimePeriod = Math.round(Math.abs(config.minTimePeriod)) || 1000;
-    
+
       if (minTimePeriod > countTime) {
         this.status({
           fill: "red",
@@ -58,35 +58,40 @@ module.exports = function(RED) {
 
 
 
-      var myCounter = node.context().flow.get(config.variableName) || {'counter':0,'countTime':countTime,'minTimePeriod':minTimePeriod,'stopTime':now+countTime,'variableName':config.variableName};
-   
+      var myCounter = node.context().flow.get(config.variableName) || {
+        'counter': 0,
+        'countTime': countTime,
+        'minTimePeriod': minTimePeriod,
+        'stopTime': now + countTime,
+        'variableName': config.variableName,
+        'resetSensitive': false,
+      };
+
       var reset = false;
       var resetcounter = false;
       var resetall = false;
       // obsługa messages -> input
-      if ('payload' in msgIn) {
+      if ( ('payload' in msgIn) && myCounter.resetSensitive) {
         if (String(msgIn['payload']).toLowerCase() == "reset") {
-         reset=true;
-        } else if(String(msgIn['payload']).toLowerCase()=='resetcounter')
-        {
-        resetcounter=true;
+          reset = true;
+        } else if (String(msgIn['payload']).toLowerCase() == 'resetcounter') {
+          resetcounter = true;
         } else if (String(msgIn['payload']).toLowerCase() == 'resetall') {
-        resetall=true;
+          resetall = true;
         }
       }
 
-      if(reset || resetall)
-      {
-        myCounter.stopTime=myCounter.stopTime+countTime;
+      if (reset || resetall) {
+        myCounter.stopTime = myCounter.stopTime + countTime;
       }
-      if(resetcounter || resetall)
-      {
-        myCounter.counter=0; 
+      if (resetcounter || resetall) {
+        myCounter.counter = 0;
       }
-      
 
+      // make sensitive to reset - this is important by first run with reset/resetAll/resetCounter payload - prohibits to add run time twice
+      myCounter.resetSensitive=true;
       //save data
-      node.context().flow.set(config.variableName,myCounter);
+      node.context().flow.set(config.variableName, myCounter);
 
       /**
        * if timer exists - exit
@@ -100,7 +105,7 @@ module.exports = function(RED) {
       }
 
       node.context().flow.set(config.variableName, myCounter);
-      
+
 
       this.status({
         fill: "blue",
@@ -110,19 +115,19 @@ module.exports = function(RED) {
 
       msg = {
         payload: {
-        counter: myCounter.counter,
-        stopTime: myCounter.stopTime,
-        recallTime: myCounter.recallTime,
-        countTime: myCounter.countTime,
-        minTimePeriod: myCounter.minTimePeriod,
-        timestamp: Date.now(),
-        state: "counting",
-        msgIn: msgIn
+          counter: myCounter.counter,
+          stopTime: myCounter.stopTime,
+          recallTime: myCounter.recallTime,
+          countTime: myCounter.countTime,
+          minTimePeriod: myCounter.minTimePeriod,
+          timestamp: Date.now(),
+          state: "counting",
+          msgIn: msgIn
         }
       }
       node.send(msg);
-      myCounter.timer = setInterval(timeLoop, myCounter.recallTime, myCounter.variableName,node);
-      
+      myCounter.timer = setInterval(timeLoop, myCounter.recallTime, myCounter.variableName, node);
+
     });
   }
 
@@ -135,18 +140,18 @@ module.exports = function(RED) {
     return time;
   }
   /**
-  function timeLoop 
+  function timeLoop
   */
   //async function timeLoop(variableName, childNode) {
-function timeLoop(variableName, childNode) {
-  var now = Date.now();
+  function timeLoop(variableName, childNode) {
+    var now = Date.now();
     var myCounter = childNode.context().flow.get(variableName);
-    myCounter.counter=myCounter.counter+1;
-    childNode.context().flow.set(variableName,myCounter);
+    myCounter.counter = myCounter.counter + 1;
+    childNode.context().flow.set(variableName, myCounter);
     childNode.status({
       fill: "green",
       shape: "dot",
-      text: "state: ACTIVE counter: " + myCounter.counter + " ->; stop in " + (myCounter.stopTime- now) +" us <" + timeConvert(now) + ">"
+      text: "state: ACTIVE counter: " + myCounter.counter + " ->; stop in " + (myCounter.stopTime - now) + " us <" + timeConvert(now) + ">"
     });
 
     //normal message
@@ -164,8 +169,8 @@ function timeLoop(variableName, childNode) {
     childNode.send(msg);
     /**
      * stop after time
-    */
-    if (myCounter.stopTime  <= now) {
+     */
+    if (myCounter.stopTime <= now) {
 
       msg = {
         payload: {
@@ -178,7 +183,7 @@ function timeLoop(variableName, childNode) {
           state: "end",
         }
       }
-     var msg2 = {
+      var msg2 = {
         payload: {
           counter: myCounter.counter,
           stopTime: myCounter.stopTime,
@@ -192,7 +197,7 @@ function timeLoop(variableName, childNode) {
 
 
       childNode.send(msg);
-      setTimeout(function () {
+      setTimeout(function() {
         childNode.send(msg2);
       }, 300);
 
@@ -204,7 +209,7 @@ function timeLoop(variableName, childNode) {
       deleteInterval(variableName, childNode);
     }
     // send message
-   
+
 
   }
   /**
@@ -216,7 +221,7 @@ function timeLoop(variableName, childNode) {
     if (myCounter.timer !== undefined) {
       clearInterval(myCounter.timer);
     }
-    childNode.context().flow.set(variableName,undefined)
+    childNode.context().flow.set(variableName, undefined)
 
 
   }
