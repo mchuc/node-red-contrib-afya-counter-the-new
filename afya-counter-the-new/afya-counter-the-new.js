@@ -67,9 +67,44 @@ module.exports = function(RED) {
         'resetSensitive': false,
       };
 
+      
+      var kill = false;
+      var destroy = false;
+      if('payload' in msgIn)
+      {
+        if(String(msgIn['payload']).toLowerCase()=="kill")
+        {
+          kill=true;
+        } else if (String(msgIn['payload']).toLowerCase() == "destroy")
+        {
+          destroy=true;
+        }
+      }
+
+      if(kill || destroy)
+      {
+        myCounter.resetSensitive=false;
+      }
+      if(kill || destroy)
+      {
+        myCounter.stopTime=now;
+      }
+      if(destroy)
+      {
+        node.context().flow.set(config.variableName, myCounter);
+        deleteInterval(config.variableName, node);
+        this.status({
+          fill: "red",
+          shape: "dot",
+          text: "state: DESTROYED - <" + timeConvert(now) + ">"
+        });
+        return;
+      }
+      
       var reset = false;
       var resetcounter = false;
       var resetall = false;
+
       // obsługa messages -> input
       if ( ('payload' in msgIn) && myCounter.resetSensitive) {
         if (String(msgIn['payload']).toLowerCase() == "reset") {

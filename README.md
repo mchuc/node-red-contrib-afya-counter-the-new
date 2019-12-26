@@ -7,6 +7,8 @@ You can send commands as PAYLOAD:
 reset -> clears the timer, does not reset the counter; that is: it adds the time to the counter by the programmed time
 resetCounter -> reset the counter, not the timer
 resetAll -> reset and timer and counter
+kill -> kills timer - with payload
+destroy -> destroy timer with no payload
 
 
 PL
@@ -18,3 +20,5 @@ Można wysłać jako PAYLOAD komendy:
  reset -> kasuje timer, nie kasuje licznika ; czyli: dodaje czas do licznika o zaprogramowany czas
  resetCounter - > kasuje licznik, nie kasuje timera
  resetAll -> kasuje i timer i licznik
+ kill -> niszczy licznik i powoduje wywołanie zakończenia
+ destroy -> niszczy licznik, bez zwrotu zakończenia
