@@ -110,7 +110,7 @@ module.exports = function(RED) {
       this.status({
         fill: "blue",
         shape: "ring",
-        text: "state: STARTING... counter: " + myCounter.counter + " ->; stop in " + (myCounter.stopTime - Date.now()) + " us <" + timeConvert(Date.now()) + ">"
+        text: "state: STARTING... counter: " + myCounter.counter + " ->; stop @ " + timeConvert(myCounter.stopTime)+ " in " + (myCounter.stopTime - now)/1000 + "s <" + timeConvert(now) + ">"
       });
 
       msg = {
@@ -151,7 +151,7 @@ module.exports = function(RED) {
     childNode.status({
       fill: "green",
       shape: "dot",
-      text: "state: ACTIVE counter: " + myCounter.counter + " ->; stop in " + (myCounter.stopTime - now) + " us <" + timeConvert(now) + ">"
+      text: "state: ACTIVE counter: " + myCounter.counter + " ->; stop @ " + timeConvert(myCounter.stopTime)+ " in " + (myCounter.stopTime - now)/1000 + " s <" + timeConvert(now) + ">"
     });
 
     //normal message
