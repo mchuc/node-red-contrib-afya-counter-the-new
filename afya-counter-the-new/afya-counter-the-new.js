@@ -82,7 +82,7 @@ module.exports = function (RED) {
             if (command === "destroy") {
                 node.context().flow.set(variableName, myCounter);
                 deleteInterval(variableName, node);
-                updateStatus("orange", "dot", `state: DESTROYED <${timeConvert(now)}>`);
+                updateStatus(node,"orange", "dot", `state: DESTROYED <${timeConvert(now)}>`);
             }
         };
 
@@ -106,6 +106,7 @@ module.exports = function (RED) {
             node.context().flow.set(variableName, myCounter);
 
             updateStatus(
+                node,
                 "blue",
                 "ring",
                 `state: STARTING... counter: ${myCounter.counter} ->; stop @ ${timeConvert(
@@ -137,6 +138,7 @@ module.exports = function (RED) {
             childNode.context().flow.set(variableName, myCounter);
 
             updateStatus(
+                node,
                 "green",
                 "dot",
                 `state: ACTIVE counter: ${myCounter.counter} ->; stop @ ${timeConvert(myCounter.stopTime)} in ${
@@ -151,6 +153,7 @@ module.exports = function (RED) {
                 setTimeout(() => childNode.send(createMessage(myCounter, "waiting")), 300);
 
                 updateStatus(
+                    node,
                     "red",
                     "dot",
                     `state: STOP counter: ${myCounter.counter} <${timeConvert(now)}>`
