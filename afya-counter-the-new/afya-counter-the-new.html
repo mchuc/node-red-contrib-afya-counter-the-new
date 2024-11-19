@@ -69,32 +69,28 @@
 
 <script type="text/x-red" data-help-name="afya-counter-the-new">
   <p><b>EN</b></p><hr>
-<p> I get annoyed at the usual Node Red counter. I feel I have no control over it. That's why I made my own, with an additional option.<br>
-You can send commands as PAYLOAD:<br/>
-  <code>
-  reset -> clears the timer, does not reset the counter; that is: it adds the time to the counter by the programmed time<br/>
-  resetCounter -> reset the counter, not the timer<br/>
-  resetAll -> reset and timer and counter<br/>
-  kill -> kills timer - with payload<br/>
-  destroy -> destroy timer with no payload<br/>
-  
- </code>
-</p>
+  <p>I get annoyed at the usual Node Red counter. I feel I have no control over it. That's why I made my own, with an additional option.<br>
+    You can send commands as PAYLOAD:<br/>
+    <code>
+      reset -> clears the timer, does not reset the counter; that is: it adds the time to the counter by the programmed time<br/>
+      resetCounter -> reset the counter, not the timer<br/>
+      resetAll -> reset and timer and counter<br/>
+      kill -> kills timer - with payload<br/>
+      destroy -> destroy timer with no payload<br/>
+      addtime -> adds `countTime` to the current stopTime<br/>
+    </code>
+  </p>
 
-
-
-<p><b>PL</b></p><hr>
-
-<p> Denerwuje mnie zwykły licznik w Node Red. Czuję, że nie mam nad nim kontroli. Dlatego zrobiłem swój, własny, z dodatkową opcją.<br/>
-
-Można wysłać jako PAYLOAD komendy:<br/>
-<code>
-  reset -> kasuje timer, nie kasuje licznika ; czyli: dodaje czas do licznika o zaprogramowany czas<br/>
-  resetCounter - > kasuje licznik, nie kasuje timera<br/>
-  resetAll -> kasuje i timer i licznik<br/>
-  kill -> niszczy licznik i powoduje wywołanie zakończenia<br/>
-  destroy -> niszczy licznik, bez zwrotu zakończenia<br/>
-
-</code></p>
-
- </script>
+  <p><b>PL</b></p><hr>
+  <p>Denerwuje mnie zwykły licznik w Node Red. Czuję, że nie mam nad nim kontroli. Dlatego zrobiłem swój, własny, z dodatkową opcją.<br/>
+    Można wysłać jako PAYLOAD komendy:<br/>
+    <code>
+      reset -> kasuje timer, nie kasuje licznika ; czyli: dodaje czas do licznika o zaprogramowany czas<br/>
+      resetCounter -> kasuje licznik, nie kasuje timera<br/>
+      resetAll -> kasuje i timer i licznik<br/>
+      kill -> niszczy licznik i powoduje wywołanie zakończenia<br/>
+      destroy -> niszczy licznik, bez zwrotu zakończenia<br/>
+      addtime -> dodaje czas `countTime` do istniejącego `stopTime`<br/>
+    </code>
+  </p>
+</script>

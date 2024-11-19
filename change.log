@@ -1,3 +1,5 @@
+0.0.5:
+today I found that the reset /resetall function adds time indefinitely, which was not intended, from now on the reset function only adds the scheduled time to the time of the function call; for compatibility I added the addtime function
 0.0.4:
 kill & destroy messages in payload added
 0.0.3:
