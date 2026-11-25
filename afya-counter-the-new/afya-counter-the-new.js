@@ -1,189 +1,175 @@
 /**
- * AFYA Counter The New by Marcin Chuć
- * e-mail: marcin ...change it to at... afya.pl
- * (C) 2019
+ * AFYA Counter The New – counts up every `minTimePeriod` ms for `countTime` ms.
+ * (C) 2019–2026 Marcin Chuć · MIT
+ *
+ * The state lives in a flow/global context variable (plain JSON, so it also works
+ * with persistent context stores); the timer itself stays inside the node.
  */
+'use strict';
+
+const COMMANDS = ['reset', 'resetcounter', 'resetall', 'addtime', 'kill', 'destroy'];
+
+function hhmmss(d = new Date()) {
+  return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':');
+}
+
+function seconds(ms) {
+  return `${Math.max(0, Math.round(ms / 1000))} s`;
+}
 
 module.exports = function (RED) {
-    const setMisconfiguredStatus = (node, message, timestamp) => {
-        node.status({
-            fill: "red",
-            shape: "dot",
-            text: `missconfigured - ${message} <${timeConvert(timestamp)}>`
-        });
+  function AFYACounterTheNew(config) {
+    RED.nodes.createNode(this, config);
+    const node = this;
+
+    // legacy nodes (no scope saved) keep using flow context
+    const scope = config.scope === 'global' ? 'global' : 'flow';
+    let name = String(config.variableName === undefined ? '' : config.variableName).trim();
+    if (!name || name === '-1') name = `AFYA_counter_${node.id}`;
+    const { key, store } = RED.util.parseContextStore(name);
+    const ctx = () => node.context()[scope];
+    const load = () => ctx().get(key, store);
+    const save = (state) => ctx().set(key, state, store);
+
+    const countTime = Math.abs(Number(config.countTime)) || 60000;
+    const minTimePeriod = Math.abs(Number(config.minTimePeriod)) || 1000;
+    const configError =
+      minTimePeriod > countTime ? 'interval is longer than the counting time' : null;
+
+    let timer = null;
+    const timeouts = new Set();
+
+    const later = (fn, ms) => {
+      const t = setTimeout(() => {
+        timeouts.delete(t);
+        fn();
+      }, ms);
+      timeouts.add(t);
     };
 
-    const updateStatus = (node, fill, shape, text) => {
-        node.status({fill, shape, text});
-    };
+    const message = (state, phase) => ({
+      payload: {
+        counter: state.counter,
+        stopTime: state.stopTime,
+        recallTime: state.recallTime,
+        countTime: state.countTime,
+        minTimePeriod: state.minTimePeriod,
+        timestamp: Date.now(),
+        state: phase,
+      },
+    });
 
-    function AFYACounterTheNew(config) {
-        RED.nodes.createNode(this, config);
-        const node = this;
+    const activeStatus = (state, starting) =>
+      node.status({
+        fill: starting ? 'blue' : 'green',
+        shape: starting ? 'ring' : 'dot',
+        text: `${starting ? 'start' : 'counting'} ${state.counter} · stop ${hhmmss(new Date(state.stopTime))} (in ${seconds(
+          state.stopTime - Date.now(),
+        )})`,
+      });
 
-        const validateConfig = (now) => {
-            const {countTime = 60000, minTimePeriod = 1000} = config;
-
-            if (!config.variableName || config.variableName === -1) {
-                setMisconfiguredStatus(node, "please edit this Node and set variableName", now);
-                return false;
-            }
-
-            if (minTimePeriod > countTime) {
-                setMisconfiguredStatus(node, "minTimePeriod is greater than countTime - make correction, please", now);
-                return false;
-            }
-
-            if (minTimePeriod <= 0 || countTime <= 0) {
-                setMisconfiguredStatus(node, "minTimePeriod and countTime must be greater than 0", now);
-                return false;
-            }
-
-            return true;
-        };
-
-        node.on("input", function (msgIn) {
-            const now = Date.now();
-            if (!validateConfig(now)) return;
-
-            const {variableName, countTime = 60000, minTimePeriod = 1000} = config;
-            let myCounter =
-                node.context().flow.get(variableName) || createInitialCounter();
-
-            const command = String(msgIn.payload || "").toLowerCase();
-
-            if (["kill", "destroy"].includes(command)) {
-                handleKillDestroy(command, myCounter, now, variableName);
-                return;
-            }
-
-            if (["reset", "resetcounter", "resetall", "addtime"].includes(command) && myCounter.resetSensitive) {
-                handleResets(command, myCounter, countTime);
-            }
-
-            if (myCounter.timer !== undefined) return;
-
-            startCounterLoop(myCounter, variableName, node, now);
-        });
-
-        const createInitialCounter = () => ({
-            counter: 0,
-            countTime: Math.abs(config.countTime) || 60000,
-            minTimePeriod: Math.abs(config.minTimePeriod) || 1000,
-            stopTime: Date.now() + (Math.abs(config.countTime) || 60000),
-            variableName: config.variableName,
-            resetSensitive: false,
-        });
-
-        const handleKillDestroy = (command, myCounter, now, variableName) => {
-            myCounter.resetSensitive = false;
-            myCounter.stopTime = now;
-
-            if (command === "destroy") {
-                node.context().flow.set(variableName, myCounter);
-                deleteInterval(variableName, node);
-                updateStatus(node,"orange", "dot", `state: DESTROYED <${timeConvert(now)}>`);
-            }
-        };
-
-        const handleResets = (command, myCounter, countTime) => {
-            if (command === "addtime") {
-                myCounter.stopTime += countTime;
-            }
-            if (command === "reset" || command === "resetall") {
-                myCounter.stopTime = Date.now() + (Math.abs(config.countTime) || 60000);
-            }
-            if (command === "resetcounter" || command === "resetall") {
-                myCounter.counter = 0;
-            }
-            myCounter.resetSensitive = true;
-            node.context().flow.set(config.variableName, myCounter);
-        };
-
-        const startCounterLoop = (myCounter, variableName, node, now) => {
-            myCounter.recallTime = myCounter.minTimePeriod;
-            myCounter.resetSensitive = true;
-            node.context().flow.set(variableName, myCounter);
-
-            updateStatus(
-                node,
-                "blue",
-                "ring",
-                `state: STARTING... counter: ${myCounter.counter} ->; stop @ ${timeConvert(
-                    myCounter.stopTime
-                )} in ${(myCounter.stopTime - now) / 1000}s <${timeConvert(now)}>`
-            );
-
-            node.send(createMessage(myCounter, "counting"));
-
-            myCounter.timer = setInterval(() => timeLoop(variableName, node), myCounter.recallTime);
-        };
-
-        const createMessage = (myCounter, state) => ({
-            payload: {
-                counter: myCounter.counter,
-                stopTime: myCounter.stopTime,
-                recallTime: myCounter.recallTime,
-                countTime: myCounter.countTime,
-                minTimePeriod: myCounter.minTimePeriod,
-                timestamp: Date.now(),
-                state,
-            },
-        });
-
-        function timeLoop(variableName, childNode) {
-            const now = Date.now();
-            const myCounter = childNode.context().flow.get(variableName);
-            myCounter.counter += 1;
-            childNode.context().flow.set(variableName, myCounter);
-
-            updateStatus(
-                node,
-                "green",
-                "dot",
-                `state: ACTIVE counter: ${myCounter.counter} ->; stop @ ${timeConvert(myCounter.stopTime)} in ${
-                    (myCounter.stopTime - now) / 1000
-                }s <${timeConvert(now)}>`
-            );
-
-            childNode.send(createMessage(myCounter, "counting"));
-
-            if (myCounter.stopTime <= now) {
-                childNode.send(createMessage(myCounter, "end"));
-                setTimeout(() => childNode.send(createMessage(myCounter, "waiting")), 300);
-
-                updateStatus(
-                    node,
-                    "red",
-                    "dot",
-                    `state: STOP counter: ${myCounter.counter} <${timeConvert(now)}>`
-                );
-
-                deleteInterval(variableName, childNode);
-            }
-        }
-
-        function deleteInterval(variableName, childNode) {
-            const myCounter = childNode.context().flow.get(variableName);
-
-            if (myCounter?.timer !== undefined) {
-                clearInterval(myCounter.timer);
-            }
-            childNode.context().flow.set(variableName, undefined);
-        }
-
-        function timeConvert(myTimeStamp) {
-            const d = new Date(myTimeStamp);
-
-            const padZero = (num) => String(num).padStart(2, "0");
-
-            return `${d.getFullYear()}/${padZero(d.getMonth() + 1)}/${padZero(d.getDate())} ${[
-                padZero(d.getHours()),
-                padZero(d.getMinutes()),
-                padZero(d.getSeconds()),
-            ].join(":")}`;
-        }
+    function stopTimer() {
+      if (timer) clearInterval(timer);
+      timer = null;
     }
 
-    RED.nodes.registerType("afya-counter-the-new", AFYACounterTheNew);
+    /** Ends counting: sends "end", 300 ms later "waiting", clears the variable. */
+    function finish(state) {
+      stopTimer();
+      save(undefined);
+      node.send(message(state, 'end'));
+      later(() => node.send(message(state, 'waiting')), 300);
+      node.status({ fill: 'red', shape: 'dot', text: `stop · counter ${state.counter} · ${hhmmss()}` });
+    }
+
+    function tick() {
+      const state = load();
+      if (!state || typeof state !== 'object') {
+        // the variable was removed from outside – stop quietly
+        stopTimer();
+        node.status({ fill: 'grey', shape: 'ring', text: `stopped (variable removed) · ${hhmmss()}` });
+        return;
+      }
+      state.counter += 1;
+      save(state);
+      node.send(message(state, 'counting'));
+      if (state.stopTime <= Date.now()) finish(state);
+      else activeStatus(state, false);
+    }
+
+    function start() {
+      const now = Date.now();
+      const state = {
+        counter: 0,
+        countTime,
+        minTimePeriod,
+        recallTime: minTimePeriod,
+        stopTime: now + countTime,
+        variableName: key,
+        resetSensitive: true,
+        startTime: now,
+      };
+      save(state);
+      activeStatus(state, true);
+      node.send(message(state, 'counting'));
+      timer = setInterval(tick, minTimePeriod);
+    }
+
+    if (configError) node.status({ fill: 'red', shape: 'ring', text: configError });
+    else node.status({ fill: 'grey', shape: 'ring', text: `ready · ${scope}.${key}` });
+
+    node.on('input', (msg, send, done) => {
+      if (configError) return done(new Error(`AFYA counter: ${configError}`));
+
+      const cmd = typeof msg.payload === 'string' ? msg.payload.trim().toLowerCase() : '';
+      const running = timer !== null;
+
+      if (cmd === 'kill' || cmd === 'destroy') {
+        if (!running) {
+          save(undefined);
+          node.status({ fill: 'grey', shape: 'ring', text: `not running · ${hhmmss()}` });
+          return done();
+        }
+        const state = load() || {};
+        if (cmd === 'kill') {
+          state.stopTime = Date.now();
+          state.resetSensitive = false;
+          finish(state);
+        } else {
+          stopTimer();
+          save(undefined);
+          node.status({ fill: 'orange', shape: 'dot', text: `destroyed · ${hhmmss()}` });
+        }
+        return done();
+      }
+
+      if (running) {
+        const state = load();
+        if (state && COMMANDS.includes(cmd)) {
+          if (cmd === 'addtime') state.stopTime += countTime;
+          if (cmd === 'reset' || cmd === 'resetall') state.stopTime = Date.now() + countTime;
+          if (cmd === 'resetcounter' || cmd === 'resetall') state.counter = 0;
+          save(state);
+          activeStatus(state, false);
+        }
+        // while counting, other messages are ignored
+        return done();
+      }
+
+      start();
+      done();
+    });
+
+    node.on('close', (removed, done) => {
+      if (timer) {
+        stopTimer();
+        save(undefined);
+      }
+      timeouts.forEach(clearTimeout);
+      timeouts.clear();
+      done();
+    });
+  }
+
+  RED.nodes.registerType('afya-counter-the-new', AFYACounterTheNew);
 };

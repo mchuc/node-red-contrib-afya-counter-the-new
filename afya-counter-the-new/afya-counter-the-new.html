@@ -1,96 +1,198 @@
-<!-- /**
- * AFYA Counter The New by  Marcin Chuć
- * e-mail: marcin ...change it to at... afya.pl
- * (C) 2019
- */ -->
+<!--
+  AFYA Counter The New – counts up every N ms for a given time.
+  (C) 2019–2026 Marcin Chuć · MIT
+-->
+<style>
+  /* AFYA – common editor style (identical in all AFYA nodes) */
+  .afya-form .form-row > label { width: 130px; }
+  .afya-form .afya-section {
+    display: flex; align-items: center; gap: 7px;
+    margin: 18px 0 10px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--red-ui-secondary-border-color, #ddd);
+    color: var(--red-ui-primary-text-color, #555);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  }
+  .afya-form .afya-section > i { color: #3E9C86; width: 14px; text-align: center; }
+  .afya-form .afya-hint { margin: -4px 0 12px 134px; font-size: 12px; line-height: 1.45; color: var(--red-ui-secondary-text-color, #888); }
+  .afya-form .afya-hint code { font-size: 11px; }
+  .afya-form .afya-check { display: flex; align-items: center; gap: 8px; margin: 0 0 12px 134px; }
+  .afya-form .afya-check input { width: auto; margin: 0; }
+  .afya-form .afya-check label { width: auto; margin: 0; cursor: pointer; }
+  .afya-form .afya-unit { margin-left: 8px; color: var(--red-ui-secondary-text-color, #888); }
+  .afya-form .afya-summary {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-top: 18px; padding: 10px 12px; border-radius: 6px;
+    border-left: 4px solid #6CC1AD;
+    background: var(--red-ui-tertiary-background, #f7f7f7);
+    color: var(--red-ui-primary-text-color, #555); font-size: 12px; line-height: 1.55;
+  }
+  .afya-form .afya-summary > i { margin-top: 3px; color: #3E9C86; }
+  .afya-form .afya-summary code { font-size: 11px; }
+</style>
+
 <script type="text/javascript">
-  RED.nodes.registerType('afya-counter-the-new', {
-        category: 'function',
-        color: '#71FFC2',
-        paletteLabel: 'counter-the-new',
-        defaults: {
-          name: {
-            value: ""
-          },
-          variableName: {
-            value: -1,
-            required: true,
-          },
-          countTime: {
-            value: 60000,
-            required: true,
-            validate: RED.validators.number()
-          },
-          minTimePeriod: {
-            value: 1000,
-            required: true,
-            validate: RED.validators.number()
+  (function () {
+    const randomName = (prefix) => prefix + Math.random().toString(36).slice(2, 7) + Date.now().toString().slice(-5);
+    const plainKey = (v) => String(v || '').replace(/^#:\(\S+?\)::/, '');
+    const positive = (v) => /^\d+$/.test(String(v).trim()) && Number(v) > 0;
+
+    /** 3725000 → "1 h 2 min 5 s" */
+    function human(ms) {
+      ms = Number(ms);
+      if (!(ms > 0)) return '–';
+      if (ms < 1000) return ms + ' ms';
+      let s = Math.round(ms / 1000);
+      const parts = [];
+      const h = Math.floor(s / 3600); s -= h * 3600;
+      const m = Math.floor(s / 60); s -= m * 60;
+      if (h) parts.push(h + ' h');
+      if (m) parts.push(m + ' min');
+      if (s || !parts.length) parts.push(s + ' s');
+      return parts.join(' ');
+    }
+
+    RED.nodes.registerType('afya-counter-the-new', {
+      category: 'AFYA',
+      color: '#A6DCCF',
+      paletteLabel: 'counter',
+      icon: 'font-awesome/fa-hourglass-half',
+      inputs: 1,
+      outputs: 1,
+      inputLabels: 'start / command in msg.payload',
+      outputLabels: 'msg.payload = { counter, state, stopTime, … }',
+      defaults: {
+        name: { value: '' },
+        variableName: { value: '', required: true },
+        scope: { value: 'global' },
+        countTime: { value: 60000, required: true, validate: positive },
+        minTimePeriod: {
+          value: 1000,
+          required: true,
+          validate: function (v) {
+            const count = Number($('#node-input-countTime').length ? $('#node-input-countTime').val() : this.countTime);
+            return positive(v) && Number(v) <= count;
           },
         },
-          inputs: 1,
-          outputs: 1,
-          icon: "history.png",
-          label: function() {
-            return this.name || "CT: "+ this.countTime + " ms  -> + 1 every " + this.minTimePeriod + " ms";
-          },
-          oneditprepare: function() {
-            if ($("#node-input-variableName").val() == -1) {
-              $("#node-input-variableName").val("AFYA_" + Math.random().toString(36).substr(2,10) + Date.now().toString().substr(-7));
-            }
-          }
-        });
+      },
+      label: function () {
+        return this.name || 'count ' + human(this.countTime) + ' · +1 every ' + human(this.minTimePeriod);
+      },
+      labelStyle: function () {
+        return this.name ? 'node_label_italic' : '';
+      },
+      oneditprepare: function () {
+        // nodes saved before 0.1.0 have no scope → they used flow context
+        if (!this.scope) $('#node-input-scope').val('flow');
+        const name = $('#node-input-variableName');
+        if (!plainKey(name.val()) || name.val() === '-1') name.val(randomName('AFYA_'));
+        name.typedInput({ types: ['global', 'flow'], typeField: '#node-input-scope' });
 
+        $('#node-input-countTime').spinner({ min: 1, step: 1000 });
+        $('#node-input-minTimePeriod').spinner({ min: 1, step: 100 });
+
+        const summary = function () {
+          const count = $('#node-input-countTime').val();
+          const every = $('#node-input-minTimePeriod').val();
+          $('#afya-counter-count-human').text('= ' + human(count));
+          $('#afya-counter-every-human').text('= ' + human(every));
+          const scope = name.typedInput('type');
+          const key = $('<span>').text(plainKey(name.typedInput('value')) || '…').html();
+          let text;
+          if (Number(every) > Number(count)) {
+            text = '<b style="color: var(--red-ui-text-color-error, #AD1625)">The interval must not be longer than the counting time.</b>';
+          } else {
+            const ticks = Math.floor(Number(count) / Number(every)) || 0;
+            text = 'After a message the counter goes <b>0 → ' + ticks + '</b> (+1 every ' + human(every) +
+              ') and stops after <b>' + human(count) + '</b> with <code>state: "end"</code>.<br>' +
+              'State is kept in <code>' + scope + '.' + key + '</code>.';
+          }
+          $('#afya-counter-summary').html(text);
+        };
+        name.on('change', summary);
+        $('#node-input-countTime, #node-input-minTimePeriod').on('change keyup spin spinstop', function () {
+          setTimeout(summary, 0);
+        });
+        summary();
+      },
+    });
+  })();
 </script>
 
-<script type="text/x-red" data-template-name="afya-counter-the-new">
+<script type="text/html" data-template-name="afya-counter-the-new">
+  <div class="afya-form">
+    <div class="form-row">
+      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+      <input type="text" id="node-input-name" placeholder="optional" style="width: 65%;">
+    </div>
 
-  <div class="form-row">
-         <label for="node-input-name"><i class="icon-tag"></i> Name</label>
-         <input type="text" id="node-input-name" placeholder="Name">
+    <div class="afya-section"><i class="fa fa-clock-o"></i> Timing</div>
+    <div class="form-row">
+      <label for="node-input-countTime"><i class="fa fa-hourglass-half"></i> Count for</label>
+      <input type="text" id="node-input-countTime" style="width: 110px;">
+      <span class="afya-unit">ms <span id="afya-counter-count-human"></span></span>
+    </div>
+    <div class="form-row">
+      <label for="node-input-minTimePeriod"><i class="fa fa-plus-circle"></i> +1 every</label>
+      <input type="text" id="node-input-minTimePeriod" style="width: 110px;">
+      <span class="afya-unit">ms <span id="afya-counter-every-human"></span></span>
+    </div>
+    <div class="afya-hint">1 min = 60000 · 1 h = 3600000</div>
+
+    <div class="afya-section"><i class="fa fa-database"></i> Context variable</div>
+    <div class="form-row">
+      <label for="node-input-variableName"><i class="fa fa-globe"></i> Variable</label>
+      <input type="text" id="node-input-variableName" style="width: 65%;">
+      <input type="hidden" id="node-input-scope">
+    </div>
+    <div class="afya-hint">Holds the running state (<code>counter</code>, <code>stopTime</code>, …). Choose <b>global</b> to read it from any flow.</div>
+
+    <div class="afya-summary"><i class="fa fa-info-circle"></i><span id="afya-counter-summary"></span></div>
   </div>
+</script>
 
-  <div class="form-row">
-           <label for="node-input-variableName"><i class="icon-bookmark"></i> Variable name</label>
-           <input type="text" id="node-input-variableName" placeholder="Your_Unique_Variable_Name">
-  </div>
+<script type="text/html" data-help-name="afya-counter-the-new">
+  <p>A counter you are in control of: after any message it counts <code>+1</code> every <i>interval</i> until the
+    <i>counting time</i> is over. Commands in <code>msg.payload</code> change it while it runs.</p>
 
-  <div class="form-row">
-            <label for="node-config-input-countTime"><i class="icon-clock"></i> how long should he count down (in miliseconds)</label>
-            <input type="text" id="node-input-countTime" placeholder="1 min = 60000, 60 min=3600000">
-  </div>
+  <h3>Inputs</h3>
+  <dl class="message-properties">
+    <dt>payload <span class="property-type">any | string</span></dt>
+    <dd>When idle – any message starts counting. While counting – only these commands are used:
+      <ul>
+        <li><code>reset</code> – restart the time (stop = now + counting time), keep the counter,</li>
+        <li><code>resetCounter</code> – set the counter to 0, keep the time,</li>
+        <li><code>resetAll</code> – both of the above,</li>
+        <li><code>addtime</code> – add the counting time to the current stop time,</li>
+        <li><code>kill</code> – stop now and send <code>end</code> + <code>waiting</code>,</li>
+        <li><code>destroy</code> – stop now without sending anything.</li>
+      </ul>
+    </dd>
+  </dl>
 
-  <div class="form-row">
-       <label for="node-config-input-minTimePeriod"><i class="icon-bookmark"></i> how often increase the counter by 1</label>
-       <input type="text" id="node-input-minTimePeriod" placeholder="default 1s = : 1000">
-   </div>
+  <h3>Outputs</h3>
+  <dl class="message-properties">
+    <dt>payload.state <span class="property-type">string</span></dt>
+    <dd><code>counting</code> on every step, <code>end</code> when finished, <code>waiting</code> 300&nbsp;ms later.</dd>
+    <dt>payload.counter <span class="property-type">number</span></dt>
+    <dd>Current value of the counter.</dd>
+    <dt>payload.stopTime <span class="property-type">number</span></dt>
+    <dd>When counting ends (ms timestamp).</dd>
+    <dt>payload.countTime, minTimePeriod, recallTime, timestamp <span class="property-type">number</span></dt>
+    <dd>Configuration and the time of the message.</dd>
+  </dl>
 
+  <h3>Details</h3>
+  <p>While running, the state is kept in a <b>global</b> or <b>flow</b> context variable, so other nodes can
+    read it (e.g. <code>global.get("AFYA_…").counter</code>) and it works with persistent context stores.
+    The variable is removed when counting ends. Nodes created before version 0.1.0 keep using <b>flow</b>
+    until you change it. A redeploy stops a running counter.</p>
 
- </script>
+  <h3>Polski</h3>
+  <p>Licznik: po dowolnej wiadomości liczy <code>+1</code> co zadany czas, aż minie czas liczenia. Komendy w
+    <code>msg.payload</code>: <code>reset</code> (od nowa czas), <code>resetCounter</code> (zeruje licznik),
+    <code>resetAll</code> (oba), <code>addtime</code> (dodaje czas), <code>kill</code> (koniec z wysłaniem
+    <code>end</code>), <code>destroy</code> (koniec bez wysyłania). Stan jest w zmiennej <b>global</b> lub
+    <b>flow</b> – dostępny z innych flow.</p>
 
-<script type="text/x-red" data-help-name="afya-counter-the-new">
-  <p><b>EN</b></p><hr>
-  <p>I get annoyed at the usual Node Red counter. I feel I have no control over it. That's why I made my own, with an additional option.<br>
-    You can send commands as PAYLOAD:<br/>
-    <code>
-      reset -> clears the timer, does not reset the counter; that is: it adds the time to the counter by the programmed time<br/>
-      resetCounter -> reset the counter, not the timer<br/>
-      resetAll -> reset and timer and counter<br/>
-      kill -> kills timer - with payload<br/>
-      destroy -> destroy timer with no payload<br/>
-      addtime -> adds `countTime` to the current stopTime<br/>
-    </code>
-  </p>
-
-  <p><b>PL</b></p><hr>
-  <p>Denerwuje mnie zwykły licznik w Node Red. Czuję, że nie mam nad nim kontroli. Dlatego zrobiłem swój, własny, z dodatkową opcją.<br/>
-    Można wysłać jako PAYLOAD komendy:<br/>
-    <code>
-      reset -> kasuje timer, nie kasuje licznika ; czyli: dodaje czas do licznika o zaprogramowany czas<br/>
-      resetCounter -> kasuje licznik, nie kasuje timera<br/>
-      resetAll -> kasuje i timer i licznik<br/>
-      kill -> niszczy licznik i powoduje wywołanie zakończenia<br/>
-      destroy -> niszczy licznik, bez zwrotu zakończenia<br/>
-      addtime -> dodaje czas `countTime` do istniejącego `stopTime`<br/>
-    </code>
-  </p>
+  <p><small>Marcin Chuć · MIT</small></p>
 </script>

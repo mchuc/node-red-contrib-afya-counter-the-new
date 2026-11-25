@@ -1,3 +1,16 @@
+0.1.0 (2026-11-25):
+- Variable scope: global or flow (new nodes: global, existing nodes keep flow) + context stores
+- State in the variable is plain JSON (the timer stays inside the node) – works with global scope
+  and persistent context stores
+- Fixed: timers kept running after a redeploy
+- Fixed: count time and interval were compared as text ("9000" > "60000")
+- "kill" ends at once (end + waiting) instead of on the next tick
+- Live preview of times in the dialog (e.g. 60000 ms = 1 min)
+- New modern edit dialog (sections, live summary, spinners, validation), palette category "AFYA",
+  Font Awesome icon, English UI with English + Polish help
+- Short, consistent node status (value · time)
+- MIT license, Node-RED >= 3.0, Node.js >= 18, unit tests (`npm test`)
+
 0.0.5:
 today I found that the reset /resetall function adds time indefinitely, which was not intended, from now on the reset function only adds the scheduled time to the time of the function call; for compatibility I added the addtime function
 0.0.4:
