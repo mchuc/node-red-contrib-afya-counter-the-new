@@ -1,3 +1,7 @@
+0.2.0 (2026-11-28):
+- Edit dialog: new setting "Labels" – descriptions in Polish for a Polish system, English for all others,
+  or chosen by hand (English / Polski); only the descriptions change, fields and values stay the same
+
 0.1.0 (2026-11-25):
 - Variable scope: global or flow (new nodes: global, existing nodes keep flow) + context stores
 - State in the variable is plain JSON (the timer stays inside the node) – works with global scope

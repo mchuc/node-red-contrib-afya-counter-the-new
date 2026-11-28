@@ -24,6 +24,7 @@ Requires Node-RED ≥ 3.0 and Node.js ≥ 18. The node appears in the **AFYA** p
 
 | Field | Description |
 |---|---|
+| Labels | Language of the descriptions in the edit dialog: *system language* (Polish for a Polish system, English for all others), *English* or *Polski*. Only the descriptions change – fields and values stay the same. |
 | **Count for** | Counting time in ms (1 min = 60000, 1 h = 3600000). |
 | **+1 every** | Interval in ms; must not be longer than the counting time. |
 | **Variable** | Context variable with the running state – `global` (readable from any flow) or `flow`, optionally in a chosen context store. |
@@ -77,6 +78,8 @@ npm install node-red-contrib-afya-counter-the-new
 ```
 
 Wymaga Node-RED ≥ 3.0 i Node.js ≥ 18. Węzeł **counter** jest w grupie palety **AFYA**.
+
+**Etykiety (Labels)** – język opisów w oknie konfiguracji: *język systemu* (polski dla polskiego systemu, angielski dla każdego innego), *English* albo *Polski*. Zmieniają się tylko opisy – pola i wartości zostają takie same.
 
 ### Komendy w `msg.payload` (w trakcie liczenia)
 

@@ -35,6 +35,61 @@
     const randomName = (prefix) => prefix + Math.random().toString(36).slice(2, 7) + Date.now().toString().slice(-5);
     const plainKey = (v) => String(v || '').replace(/^#:\(\S+?\)::/, '');
     const positive = (v) => /^\d+$/.test(String(v).trim()) && Number(v) > 0;
+    const TEXTS = {
+      en: {
+        name: 'Name', namePh: 'optional', lang: 'Labels', langAuto: 'system language ({l})',
+        secTiming: 'Timing', countFor: 'Count for', every: '+1 every',
+        secVar: 'Context variable', variable: 'Variable',
+        varHint: 'Holds the running state (<code>counter</code>, <code>stopTime</code>, …). Choose <b>global</b> to read it from any flow.',
+        sTooLong: 'The interval must not be longer than the counting time.',
+        sRun: 'After a message the counter goes <b>0 → {n}</b> (+1 every {every}) and stops after <b>{count}</b> with <code>state: "end"</code>.',
+        sKept: 'State is kept in {v}.',
+      },
+      pl: {
+        name: 'Nazwa', namePh: 'opcjonalnie', lang: 'Etykiety', langAuto: 'język systemu ({l})',
+        secTiming: 'Czas', countFor: 'Licz przez', every: '+1 co',
+        secVar: 'Zmienna kontekstu', variable: 'Zmienna',
+        varHint: 'Przechowuje stan licznika (<code>counter</code>, <code>stopTime</code>, …). Wybierz <b>global</b>, żeby czytać go z każdego flow.',
+        sTooLong: 'Odstęp nie może być dłuższy niż czas liczenia.',
+        sRun: 'Po wiadomości licznik idzie <b>0 → {n}</b> (+1 co {every}) i zatrzymuje się po <b>{count}</b> ze <code>state: "end"</code>.',
+        sKept: 'Stan jest trzymany w {v}.',
+      },
+    };
+    // --- AFYA: język opisów w oknie konfiguracji („Labels”): auto = polski tylko dla polskiego systemu,
+    //     angielski dla wszystkich innych; zmieniają się tylko opisy – nigdy pola ani wartości.
+    const afyaSystemLocale = function () {
+      try {
+        return localStorage.getItem('editor-language') || navigator.language || '';
+      } catch (e) {
+        return navigator.language || '';
+      }
+    };
+    const afyaLang = function (setting) {
+      if (setting === 'pl' || setting === 'en') return setting;
+      return /^pl\b|^pl[-_]/i.test(afyaSystemLocale()) ? 'pl' : 'en';
+    };
+    /** Tłumaczy otwarte okno (data-t, data-t-ph, data-t-title) i zwraca T(klucz, zmienne) dla tekstów z kodu. */
+    const afyaApplyLang = function (form, texts, setting) {
+      const lang = afyaLang(setting);
+      const T = function (k, v) {
+        let s = (texts[lang] && texts[lang][k]) || texts.en[k] || k;
+        Object.keys(v || {}).forEach(function (n) {
+          s = s.split('{' + n + '}').join(v[n]);
+        });
+        return s;
+      };
+      form.find('[data-t]').each(function () {
+        $(this).html(T($(this).attr('data-t')));
+      });
+      form.find('[data-t-ph]').each(function () {
+        $(this).attr('placeholder', T($(this).attr('data-t-ph')));
+      });
+      form.find('[data-t-title]').each(function () {
+        $(this).attr('title', T($(this).attr('data-t-title')));
+      });
+      form.find('#node-input-lang option[value="auto"]').text(T('langAuto', { l: afyaLang('auto') === 'pl' ? 'Polski' : 'English' }));
+      return T;
+    };
 
     /** 3725000 → "1 h 2 min 5 s" */
     function human(ms) {
@@ -62,6 +117,7 @@
       outputLabels: 'msg.payload = { counter, state, stopTime, … }',
       defaults: {
         name: { value: '' },
+        lang: { value: 'auto' },
         variableName: { value: '', required: true },
         scope: { value: 'global' },
         countTime: { value: 60000, required: true, validate: positive },
@@ -81,6 +137,9 @@
         return this.name ? 'node_label_italic' : '';
       },
       oneditprepare: function () {
+        if (['auto', 'en', 'pl'].indexOf(this.lang) < 0) $('#node-input-lang').val('auto'); // starsze węzły
+        const form = $('#node-input-lang').closest('.afya-form');
+        let T = afyaApplyLang(form, TEXTS, $('#node-input-lang').val());
         // nodes saved before 0.1.0 have no scope → they used flow context
         if (!this.scope) $('#node-input-scope').val('flow');
         const name = $('#node-input-variableName');
@@ -99,18 +158,21 @@
           const key = $('<span>').text(plainKey(name.typedInput('value')) || '…').html();
           let text;
           if (Number(every) > Number(count)) {
-            text = '<b style="color: var(--red-ui-text-color-error, #AD1625)">The interval must not be longer than the counting time.</b>';
+            text = '<b style="color: var(--red-ui-text-color-error, #AD1625)">' + T('sTooLong') + '</b>';
           } else {
             const ticks = Math.floor(Number(count) / Number(every)) || 0;
-            text = 'After a message the counter goes <b>0 → ' + ticks + '</b> (+1 every ' + human(every) +
-              ') and stops after <b>' + human(count) + '</b> with <code>state: "end"</code>.<br>' +
-              'State is kept in <code>' + scope + '.' + key + '</code>.';
+            text = T('sRun', { n: ticks, every: human(every), count: human(count) }) + '<br>' +
+              T('sKept', { v: '<code>' + scope + '.' + key + '</code>' });
           }
           $('#afya-counter-summary').html(text);
         };
         name.on('change', summary);
         $('#node-input-countTime, #node-input-minTimePeriod').on('change keyup spin spinstop', function () {
           setTimeout(summary, 0);
+        });
+        $('#node-input-lang').on('change', function () {
+          T = afyaApplyLang(form, TEXTS, $(this).val());
+          summary();
         });
         summary();
       },
@@ -121,30 +183,38 @@
 <script type="text/html" data-template-name="afya-counter-the-new">
   <div class="afya-form">
     <div class="form-row">
-      <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-      <input type="text" id="node-input-name" placeholder="optional" style="width: 65%;">
+      <label for="node-input-name"><i class="fa fa-tag"></i> <span data-t="name">Name</span></label>
+      <input type="text" id="node-input-name" data-t-ph="namePh" placeholder="optional" style="width: 65%;">
+    </div>
+    <div class="form-row">
+      <label for="node-input-lang"><i class="fa fa-language"></i> <span data-t="lang">Labels</span></label>
+      <select id="node-input-lang" style="width: 65%;">
+        <option value="auto">system language</option>
+        <option value="en">English</option>
+        <option value="pl">Polski</option>
+      </select>
     </div>
 
-    <div class="afya-section"><i class="fa fa-clock-o"></i> Timing</div>
+    <div class="afya-section"><i class="fa fa-clock-o"></i> <span data-t="secTiming">Timing</span></div>
     <div class="form-row">
-      <label for="node-input-countTime"><i class="fa fa-hourglass-half"></i> Count for</label>
+      <label for="node-input-countTime"><i class="fa fa-hourglass-half"></i> <span data-t="countFor">Count for</span></label>
       <input type="text" id="node-input-countTime" style="width: 110px;">
       <span class="afya-unit">ms <span id="afya-counter-count-human"></span></span>
     </div>
     <div class="form-row">
-      <label for="node-input-minTimePeriod"><i class="fa fa-plus-circle"></i> +1 every</label>
+      <label for="node-input-minTimePeriod"><i class="fa fa-plus-circle"></i> <span data-t="every">+1 every</span></label>
       <input type="text" id="node-input-minTimePeriod" style="width: 110px;">
       <span class="afya-unit">ms <span id="afya-counter-every-human"></span></span>
     </div>
     <div class="afya-hint">1 min = 60000 · 1 h = 3600000</div>
 
-    <div class="afya-section"><i class="fa fa-database"></i> Context variable</div>
+    <div class="afya-section"><i class="fa fa-database"></i> <span data-t="secVar">Context variable</span></div>
     <div class="form-row">
-      <label for="node-input-variableName"><i class="fa fa-globe"></i> Variable</label>
+      <label for="node-input-variableName"><i class="fa fa-globe"></i> <span data-t="variable">Variable</span></label>
       <input type="text" id="node-input-variableName" style="width: 65%;">
       <input type="hidden" id="node-input-scope">
     </div>
-    <div class="afya-hint">Holds the running state (<code>counter</code>, <code>stopTime</code>, …). Choose <b>global</b> to read it from any flow.</div>
+    <div class="afya-hint" data-t="varHint">Holds the running state (<code>counter</code>, <code>stopTime</code>, …). Choose <b>global</b> to read it from any flow.</div>
 
     <div class="afya-summary"><i class="fa fa-info-circle"></i><span id="afya-counter-summary"></span></div>
   </div>
